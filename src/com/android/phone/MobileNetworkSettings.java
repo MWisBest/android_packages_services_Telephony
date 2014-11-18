@@ -106,6 +106,7 @@ public class MobileNetworkSettings extends PreferenceActivity
     private boolean mShow4GForLTE;
     private boolean mIsGlobalCdma;
     private boolean mUnavailable;
+    private boolean mToroRIL;
 
     //This is a method implemented for DialogInterface.OnClickListener.
     //  Used to dismiss the dialogs when they come up.
@@ -248,6 +249,7 @@ public class MobileNetworkSettings extends PreferenceActivity
 
         boolean isLteOnCdma = mPhone.getLteOnCdmaMode() == PhoneConstants.LTE_ON_CDMA_TRUE;
         mIsGlobalCdma = isLteOnCdma && getResources().getBoolean(R.bool.config_show_cdma);
+	mToroRIL = SystemProperties.getInt("ro.telephony.toroRIL", 0) == 1;
         TelephonyManager tm = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
         if (tm.getSimplifiedNetworkSettingsEnabledForSubscriber(SubscriptionManager.getDefaultSubId())) {
             prefSet.removePreference(mButtonPreferredNetworkMode);
@@ -430,8 +432,13 @@ public class MobileNetworkSettings extends PreferenceActivity
                         modemNetworkMode = buttonNetworkMode;
                         break;
                     default:
-                        loge("Invalid Network Mode (" + buttonNetworkMode + ") chosen. Ignore.");
-                        return true;
+                        if (buttonNetworkMode == 7 && mToroRIL) {
+                                loge("Invalid Network Mode (" + buttonNetworkMode + ") chosen. We aren't going to ignore it because toro has a bug in its RIL that we need to bypass.");
+                                modemNetworkMode = buttonNetworkMode;
+                        } else {
+                                loge("Invalid Network Mode (" + buttonNetworkMode + ") chosen. Ignore.");
+                                return true;
+                        }
                 }
 
                 UpdatePreferredNetworkModeSummary(buttonNetworkMode);
@@ -466,8 +473,13 @@ public class MobileNetworkSettings extends PreferenceActivity
                         modemNetworkMode = buttonNetworkMode;
                         break;
                     default:
-                        loge("Invalid Network Mode (" + buttonNetworkMode + ") chosen. Ignore.");
-                        return true;
+                        if (buttonNetworkMode == 7 && mToroRIL) {
+                                loge("Invalid Network Mode (" + buttonNetworkMode + ") chosen. We aren't going to ignore it because toro has a bug in its RIL that we need to bypass.");
+                                modemNetworkMode = buttonNetworkMode;
+                        } else {
+                                loge("Invalid Network Mode (" + buttonNetworkMode + ") chosen. Ignore.");
+                                return true;
+                        }
                 }
 
                 UpdateEnabledNetworksValueAndSummary(buttonNetworkMode);
@@ -750,11 +762,21 @@ public class MobileNetworkSettings extends PreferenceActivity
                 mButtonEnabledNetworks.setSummary(R.string.network_lte);
                 break;
             case Phone.NT_MODE_CDMA:
+                if (mToroRIL) {
+                    mButtonEnabledNetworks.setValue(Integer.toString(Phone.NT_MODE_CDMA));
+                    mButtonEnabledNetworks.setSummary(R.string.network_3G);
+                    break;
+                }
             case Phone.NT_MODE_EVDO_NO_CDMA:
             case Phone.NT_MODE_GLOBAL:
-                mButtonEnabledNetworks.setValue(
-                        Integer.toString(Phone.NT_MODE_CDMA));
-                mButtonEnabledNetworks.setSummary(R.string.network_3G);
+                if (mToroRIL) {
+                    mButtonEnabledNetworks.setValue(Integer.toString(Phone.NT_MODE_GLOBAL));
+                    mButtonEnabledNetworks.setSummary(R.string.network_lte);
+                } else {
+                    mButtonEnabledNetworks.setValue(
+                            Integer.toString(Phone.NT_MODE_CDMA));
+                    mButtonEnabledNetworks.setSummary(R.string.network_3G);
+                }
                 break;
             case Phone.NT_MODE_CDMA_NO_EVDO:
                 mButtonEnabledNetworks.setValue(
